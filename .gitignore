@@ -107,5 +107,5 @@ venv.bak/
 .vscode/*
 
 # This project
-.csv
-.pickle
+*.csv
+*.pickle
