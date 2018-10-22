@@ -64,14 +64,14 @@ def main():
         kind_urls = urls[kind_name]
         total = len(kind_urls)
         for i, code in enumerate(kind_urls):
-            if code == nan or i > 3:
+            if code == nan:
                 break
             data_sr = get_description(base_domain, code, kind_urls.name)
             df = df.append(data_sr, ignore_index=True)
             logger.debug(
                 "%d / %d done: %s, Category:%s", i, total, code, kind_name
             )
-    df.to_csv("dataset_head.csv", sep=",")
+    df.to_csv("dataset_head.csv.gz", sep='|', header=True, index=False, chunksize=1000, compression='gzip', encoding='utf-8')
 
 if __name__ == '__main__':
     main()
