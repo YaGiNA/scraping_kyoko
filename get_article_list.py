@@ -1,4 +1,6 @@
 from requests_html import HTMLSession
+from requests.exceptions import ConnectionError
+from retry import retry
 from typing import List
 from time import sleep
 import pandas as pd
@@ -32,15 +34,19 @@ def get_articles(base_domain: str, kind: str) -> List[str]:
     return ret_articles
 
 
+@retry()
 def get_description(base_domain: str, code: str, kind: str) -> pd.core.series.Series:
     session = HTMLSession()
     url = base_domain + code
     r = session.get(url)
     sleep(10)
-    raw_title = r.html.find('title', first=True).text
-    raw_article = r.html.find('article', first=True).text
-    data_row = ["".join(a_text.replace("これは嘘ニュースです", "").replace("\n\n\n新しいアプリで記事を読む", "").split("\n"))
-                for a_text in [raw_title, raw_article]]
+    try:
+        raw_title = r.html.find('title', first=True).text
+        raw_article = r.html.find('article', first=True).text
+        data_row = ["".join(a_text.replace("これは嘘ニュースです", "").replace("\n\n\n新しいアプリで記事を読む", "").split("\n"))
+            for a_text in [raw_title, raw_article]]
+    except AttributeError:
+        data_row = ["404", "Not Found"]
     data = [code, kind] + data_row
     data_sr = pd.Series(data, index=["code", "kind", "title", "article"])
     return data_sr
@@ -61,17 +67,18 @@ def main():
         pickle.dump(urls, open("urls.pickle", "wb"))
     df = pd.DataFrame(columns=["code", "kind", "title", "article"])
     for kind_name in urls:
-        kind_urls = urls[kind_name]
+        raw_kind_urls = urls[kind_name]
+        kind_urls = raw_kind_urls[raw_kind_urls.apply(
+            lambda x: isinstance(x, str))]
         total = len(kind_urls)
         for i, code in enumerate(kind_urls):
-            if code == nan:
-                break
             data_sr = get_description(base_domain, code, kind_urls.name)
             df = df.append(data_sr, ignore_index=True)
             logger.debug(
                 "%d / %d done: %s, Category:%s", i, total, code, kind_name
             )
-    df.to_csv("dataset_head.csv.gz", sep='|', header=True, index=False, chunksize=1000, compression='gzip', encoding='utf-8')
+            
+    df.to_csv("dataset.csv.gz", sep='|', header=True, index=False, chunksize=1000, compression='gzip', encoding='utf-8')
 
 if __name__ == '__main__':
     main()
